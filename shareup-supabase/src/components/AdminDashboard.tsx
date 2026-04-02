@@ -24,7 +24,7 @@ const AdminDashboard = ({ onConfirmAction, setStatusMessage }: AdminDashboardPro
   const [selectedUser, setSelectedUser] = useState<PublicProfile | null>(null);
 
   const fetchUsers = () =>
-    supabase.from('users_public').select('*').order('created_at', { ascending: false }).limit(100)
+    supabase.from('public_profiles').select('*').order('created_at', { ascending: false }).limit(100)
       .then(({ data }) => { if (data) setUsers(data.map(mapPublicProfile)); setLoading(false); });
 
   const fetchDonations = () =>
@@ -36,7 +36,7 @@ const AdminDashboard = ({ onConfirmAction, setStatusMessage }: AdminDashboardPro
     fetchDonations();
 
     const chanU = supabase.channel('admin-users')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users_public' }, fetchUsers)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'public_profiles' }, fetchUsers)
       .subscribe();
 
     const chanD = supabase.channel('admin-donations')
@@ -47,7 +47,7 @@ const AdminDashboard = ({ onConfirmAction, setStatusMessage }: AdminDashboardPro
   }, []);
 
   const handleApproveUser = async (userId: string) => {
-    const { error } = await supabase.from('users_public').update({ is_approved: true }).eq('id', userId);
+    const { error } = await supabase.from('public_profiles').update({ is_approved: true }).eq('id', userId);
     if (!error) setStatusMessage("Utilisateur approuvé !");
   };
 
@@ -56,8 +56,8 @@ const AdminDashboard = ({ onConfirmAction, setStatusMessage }: AdminDashboardPro
       title: "Supprimer le compte ?",
       message: "Voulez-vous supprimer ce compte définitivement ?",
       onConfirm: async () => {
-        await supabase.from('users_public').delete().eq('id', userId);
-        await supabase.from('users').delete().eq('id', userId);
+        await supabase.from('public_profiles').delete().eq('id', userId);
+        await supabase.from('profiles').delete().eq('id', userId);
         setStatusMessage("Compte supprimé.");
       },
       type: 'danger'
@@ -104,9 +104,9 @@ const AdminDashboard = ({ onConfirmAction, setStatusMessage }: AdminDashboardPro
         await supabase.from('conversations').delete().neq('id', '');
         await supabase.from('friend_requests').delete().neq('id', '');
         await supabase.from('friends').delete().neq('id', '');
-        await supabase.from('users_public').delete().neq('id', adminUser.id);
-        await supabase.from('users').delete().neq('id', adminUser.id);
-        await supabase.from('users_public').update({
+        await supabase.from('public_profiles').delete().neq('id', adminUser.id);
+        await supabase.from('profiles').delete().neq('id', adminUser.id);
+        await supabase.from('public_profiles').update({
           stats: { donationsCount: 0, receivedCount: 0, foodSavedKg: 0, friendsCount: 0, sharedCount: 0 },
           badges: ['pioneer'],
         }).eq('id', adminUser.id);
@@ -275,8 +275,8 @@ const AdminDashboard = ({ onConfirmAction, setStatusMessage }: AdminDashboardPro
                         message: `Voulez-vous vraiment supprimer le compte de ${selectedUser.displayName} ? Irréversible.`,
                         onConfirm: async () => {
                           const uid = selectedUser.uid || selectedUser.id || '';
-                          await supabase.from('users_public').delete().eq('id', uid);
-                          await supabase.from('users').delete().eq('id', uid);
+                          await supabase.from('public_profiles').delete().eq('id', uid);
+                          await supabase.from('profiles').delete().eq('id', uid);
                           setStatusMessage("Compte supprimé.");
                           setSelectedUser(null);
                         },

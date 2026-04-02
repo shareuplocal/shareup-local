@@ -368,7 +368,7 @@ const AppContent = () => {
       localStorage.setItem(`last_loc_lng_${user.id}`, userLocation.lng.toString());
 
       supabase
-        .from('users_public')
+        .from('public_profiles')
         .update({
           last_location: {
             lat: userLocation.lat,
@@ -405,7 +405,7 @@ const AppContent = () => {
   // Acceptation des CGU
   const handleAcceptTerms = async () => {
     if (!user) return;
-    const { error } = await supabase.from('users').update({ terms_accepted: true }).eq('id', user.id);
+    const { error } = await supabase.from('profiles').update({ terms_accepted: true }).eq('id', user.id);
     if (error) console.error("Erreur acceptation CGU:", error.message);
   };
 
@@ -418,7 +418,7 @@ const AppContent = () => {
       welcomeAttempted.current = true;
       try {
         // 1. Trouver l'admin
-        const { data: admins } = await supabase.from('users_public').select('id').eq('role', 'admin').limit(1);
+        const { data: admins } = await supabase.from('public_profiles').select('id').eq('role', 'admin').limit(1);
         if (!admins?.length) return;
         const adminId = admins[0].id;
 
@@ -444,7 +444,7 @@ const AppContent = () => {
             sender_id: adminId,
           });
 
-          await supabase.from('users_public').update({ welcome_message_sent: true }).eq('id', user.id);
+          await supabase.from('public_profiles').update({ welcome_message_sent: true }).eq('id', user.id);
         }
       } catch (error: any) {
         console.error("Erreur message de bienvenue:", error?.message);

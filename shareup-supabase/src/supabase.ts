@@ -5,11 +5,22 @@ import type { UserProfile, PublicProfile, Donation, Conversation, Message, Frien
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// ─── Guard: env vars manquantes = erreur claire au lieu d'écran blanc ─────────
+if (!supabaseUrl || !supabaseAnonKey) {
+  const msg = "❌ SHAREUP — Variables d'environnement Supabase manquantes !\n\nCréez shareup-supabase/.env avec VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY\nOu configurez-les dans Netlify : Site Settings → Environment Variables";
+  console.error(msg);
+  document.body.innerHTML = `<div style="font-family:monospace;padding:2rem;color:#dc2626;background:#fef2f2;min-height:100vh;display:flex;align-items:center;justify-content:center"><pre style="background:#fff;padding:2rem;border-radius:12px;border:1px solid #fca5a5;white-space:pre-wrap;max-width:600px">${msg}</pre></div>`;
+}
+
+export const supabase = createClient(supabaseUrl ?? 'https://placeholder.supabase.co', supabaseAnonKey ?? 'placeholder', {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
 
 // ─── AppUser : wrapper compatible avec le code existant ──────────────────────
-// Ajoute uid / displayName / photoURL pour éviter de modifier tous les composants
-
 export interface AppUser extends SupabaseUser {
   uid: string;
   displayName: string | null;
@@ -20,14 +31,8 @@ export function toAppUser(user: SupabaseUser): AppUser {
   return {
     ...user,
     uid: user.id,
-    displayName:
-      user.user_metadata?.full_name ??
-      user.user_metadata?.name ??
-      null,
-    photoURL:
-      user.user_metadata?.avatar_url ??
-      user.user_metadata?.picture ??
-      null,
+    displayName: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+    photoURL: user.user_metadata?.avatar_url ?? user.user_metadata?.picture ?? null,
   };
 }
 
@@ -118,34 +123,16 @@ export function toDbPublicProfile(p: Partial<PublicProfile>): any {
 
 export function mapDonation(row: any): Donation {
   return {
-    id: row.id,
-    donorId: row.donor_id || '',
-    donorName: row.donor_name || '',
-    title: row.title || '',
-    description: row.description || '',
-    category: row.category,
-    status: row.status || 'available',
-    location: row.location || { lat: 0, lng: 0 },
-    address: row.location?.address,
-    expiryDate: row.expiry_date || '',
-    barcode: row.barcode,
-    weight: row.weight,
-    weightValue: row.weight_value || 0,
-    nutriscore: row.nutriscore,
-    ecoscore: row.ecoscore,
-    novaGroup: row.nova_group,
-    allergens: row.allergens || [],
-    composition: row.composition,
-    nutriments: row.nutriments || {},
-    imageUrl: row.image_url,
-    receiverId: row.receiver_id,
-    receiverName: row.receiver_name,
-    sharedByUids: row.shared_by_uids || [],
-    isConfirmedByDonor: row.is_confirmed_by_donor || false,
-    isConfirmedByReceiver: row.is_confirmed_by_receiver || false,
-    isPlacebo: row.is_placebo || false,
-    createdAt: row.created_at,
-    completedAt: row.completed_at,
+    id: row.id, donorId: row.donor_id || '', donorName: row.donor_name || '',
+    title: row.title || '', description: row.description || '', category: row.category,
+    status: row.status || 'available', location: row.location || { lat: 0, lng: 0 },
+    address: row.location?.address, expiryDate: row.expiry_date || '', barcode: row.barcode,
+    weight: row.weight, weightValue: row.weight_value || 0, nutriscore: row.nutriscore,
+    ecoscore: row.ecoscore, novaGroup: row.nova_group, allergens: row.allergens || [],
+    composition: row.composition, nutriments: row.nutriments || {}, imageUrl: row.image_url,
+    receiverId: row.receiver_id, receiverName: row.receiver_name, sharedByUids: row.shared_by_uids || [],
+    isConfirmedByDonor: row.is_confirmed_by_donor || false, isConfirmedByReceiver: row.is_confirmed_by_receiver || false,
+    isPlacebo: row.is_placebo || false, createdAt: row.created_at, completedAt: row.completed_at,
   };
 }
 
@@ -181,49 +168,29 @@ export function toDbDonation(d: Partial<Donation>): any {
 
 export function mapConversation(row: any): Conversation {
   return {
-    id: row.id,
-    participants: row.participants || [],
-    donationId: row.donation_id || '',
-    lastMessage: row.last_message || '',
-    lastMessageSenderId: row.last_message_sender_id || '',
-    updatedAt: row.updated_at,
-    type: row.type || 'donation',
+    id: row.id, participants: row.participants || [], donationId: row.donation_id || '',
+    lastMessage: row.last_message || '', lastMessageSenderId: row.last_message_sender_id || '',
+    updatedAt: row.updated_at, type: row.type || 'donation',
   };
 }
 
 export function mapMessage(row: any): Message {
-  return {
-    id: row.id,
-    text: row.text || '',
-    senderId: row.sender_id || '',
-    createdAt: row.created_at,
-  };
+  return { id: row.id, text: row.text || '', senderId: row.sender_id || '', createdAt: row.created_at };
 }
 
 export function mapFriend(row: any): Friend {
   return {
-    id: row.id,
-    userId: row.user_id,
-    friendId: row.friend_id,
-    friendName: row.friend_name || '',
-    friendPhoto: row.friend_photo || '',
-    displayName: row.friend_name,
-    photoURL: row.friend_photo,
-    createdAt: row.created_at,
+    id: row.id, userId: row.user_id, friendId: row.friend_id,
+    friendName: row.friend_name || '', friendPhoto: row.friend_photo || '',
+    displayName: row.friend_name, photoURL: row.friend_photo, createdAt: row.created_at,
   };
 }
 
 export function mapFriendRequest(row: any): FriendRequest {
   return {
-    id: row.id,
-    fromId: row.from_id,
-    fromName: row.from_name || '',
-    fromPhoto: row.from_photo || '',
-    fromPhotoURL: row.from_photo || '',
-    toId: row.to_id,
-    toName: row.to_name || '',
-    toPhoto: row.to_photo || '',
-    status: row.status || 'pending',
-    createdAt: row.created_at,
+    id: row.id, fromId: row.from_id, fromName: row.from_name || '',
+    fromPhoto: row.from_photo || '', fromPhotoURL: row.from_photo || '',
+    toId: row.to_id, toName: row.to_name || '', toPhoto: row.to_photo || '',
+    status: row.status || 'pending', createdAt: row.created_at,
   };
 }

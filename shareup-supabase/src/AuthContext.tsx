@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase, toAppUser, mapProfile, mapPublicProfile, toDbProfile, toDbPublicProfile, type AppUser } from './supabase';
+import { supabase, toAppUser, mapProfile, mapPublicProfile, type AppUser } from './supabase';
 import type { UserProfile, PublicProfile } from './types';
 
 interface AuthContextType {
@@ -8,16 +8,12 @@ interface AuthContextType {
   publicProfile: PublicProfile | null;
   userLocation: { lat: number; lng: number } | null;
   loading: boolean;
-  isQuotaExceeded: boolean; // Gardé pour compatibilité - toujours false avec Supabase
+  isQuotaExceeded: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  profile: null,
-  publicProfile: null,
-  userLocation: null,
-  loading: true,
-  isQuotaExceeded: false,
+  user: null, profile: null, publicProfile: null,
+  userLocation: null, loading: true, isQuotaExceeded: false,
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -27,24 +23,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Récupère la géolocalisation
+  // Géolocalisation
   useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        (err) => console.warn('Location access denied', err)
-      );
-    }
+    if (!('geolocation' in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (err) => console.warn('Location access denied', err)
+    );
   }, []);
 
-  // Crée ou met à jour le profil lors de la première connexion
+  // Crée ou met à jour le profil
   const upsertProfile = async (supabaseUser: AppUser) => {
     const isAdmin = supabaseUser.email === 'shareuplocal@gmail.com';
-    const displayName = isAdmin
-      ? "L'équipe ShareUP"
-      : (supabaseUser.displayName || 'Utilisateur');
+    const displayName = isAdmin ? "L'équipe ShareUP" : (supabaseUser.displayName || 'Utilisateur');
 
-    // Vérifier si le profil existe déjà
     const { data: existingProfile } = await supabase
       .from('profiles')
       .select('id, display_name, role')
@@ -52,7 +44,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .single();
 
     if (!existingProfile) {
-      // Créer profil privé
       await supabase.from('profiles').insert({
         id: supabaseUser.id,
         display_name: displayName,
@@ -66,7 +57,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         created_at: new Date().toISOString(),
       });
 
-      // Créer profil public
       await supabase.from('public_profiles').insert({
         id: supabaseUser.id,
         display_name: displayName,
@@ -80,8 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         created_at: new Date().toISOString(),
       });
     } else {
-      // Synchroniser le nom et le rôle si nécessaire
-      const updates: any = {};
+      const updates: Record<string, string> = {};
       if (existingProfile.display_name !== displayName) updates.display_name = displayName;
       if (isAdmin && existingProfile.role !== 'admin') updates.role = 'admin';
       if (Object.keys(updates).length > 0) {
@@ -93,33 +82,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Charge le profil depuis Supabase
   const loadProfile = async (userId: string) => {
-    const [{ data: profileData }, { data: publicData }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', userId).single(),
-      supabase.from('public_profiles').select('*').eq('id', userId).single(),
-    ]);
-    if (profileData) setProfile(mapProfile(profileData));
-    if (publicData) setPublicProfile(mapPublicProfile(publicData));
-    setLoading(false);
+    try {
+      const [{ data: profileData }, { data: publicData }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase.from('public_profiles').select('*').eq('id', userId).single(),
+      ]);
+      if (profileData) setProfile(mapProfile(profileData));
+      if (publicData) setPublicProfile(mapPublicProfile(publicData));
+    } catch (err) {
+      console.error('loadProfile error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    // Vérifier la session active au chargement
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const appUser = toAppUser(session.user);
-        setUser(appUser);
-        upsertProfile(appUser).then(() => loadProfile(appUser.id));
-      } else {
-        setLoading(false);
-      }
-    });
+    // FIX: getSession() avec catch pour éviter loading infini si Supabase inaccessible
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (session?.user) {
+          const appUser = toAppUser(session.user);
+          setUser(appUser);
+          upsertProfile(appUser).then(() => loadProfile(appUser.id));
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error('getSession error:', err);
+        setLoading(false); // FIX CRITIQUE: ne jamais bloquer indéfiniment
+      });
 
-    // Écouter les changements d'authentification
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const appUser = toAppUser(session.user);
         setUser(appUser);
-        await upsertProfile(appUser);
+        await upsertProfile(appUser).catch(console.error);
         await loadProfile(appUser.id);
       } else {
         setUser(null);
@@ -132,24 +130,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  // Écouter les changements de profil en temps réel
+  // Écoute temps réel des changements de profil
   useEffect(() => {
     if (!user) return;
 
     const channel = supabase
       .channel(`profile-${user.id}`)
       .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'profiles',
+        event: '*', schema: 'public', table: 'profiles',
         filter: `id=eq.${user.id}`,
       }, (payload) => {
         if (payload.new) setProfile(mapProfile(payload.new));
       })
       .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'public_profiles',
+        event: '*', schema: 'public', table: 'public_profiles',
         filter: `id=eq.${user.id}`,
       }, (payload) => {
         if (payload.new) setPublicProfile(mapPublicProfile(payload.new));
@@ -161,12 +155,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider value={{
-      user,
-      profile,
-      publicProfile,
-      userLocation,
-      loading,
-      isQuotaExceeded: false, // Supabase n'a pas de quota comme Firebase
+      user, profile, publicProfile, userLocation, loading,
+      isQuotaExceeded: false,
     }}>
       {children}
     </AuthContext.Provider>
