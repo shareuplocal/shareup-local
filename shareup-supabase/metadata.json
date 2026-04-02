@@ -1,0 +1,8 @@
+{
+  "name": "ShareUP",
+  "description": "Plateforme de don alimentaire entre voisins pour lutter contre le gaspillage.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}
