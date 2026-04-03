@@ -245,7 +245,7 @@ const ProfilePage: React.FC = () => {
     });
   };
 
-  if (loading) {
+  if (loading || !profile || !publicProfile) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="relative">
@@ -349,3 +349,4 @@ const ProfilePage: React.FC = () => {
 };
 
 export default ProfilePage;
+
