@@ -308,7 +308,7 @@ const ProfilePage: React.FC = () => {
 
       <div className="pb-32">
         {activeTab === 'impact' && <ImpactSection publicProfile={publicProfile} />}
-        {activeTab === 'badges' && <BadgeGrid badges={publicProfile?.badges || []} />}
+        {activeTab === 'badges' && <BadgeGrid publicProfile={publicProfile} />}
         {activeTab === 'friends' && (
           <FriendsSection
             friends={friends}
@@ -349,5 +349,6 @@ const ProfilePage: React.FC = () => {
 };
 
 export default ProfilePage;
+
 
 

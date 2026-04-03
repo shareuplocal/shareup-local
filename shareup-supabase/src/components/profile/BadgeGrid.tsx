@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils';
 import { PublicProfile } from '../../types';
 
 interface BadgeGridProps {
-  publicProfile: PublicProfile;
+  publicProfile: PublicProfile | null;
   onBadgeClick: (title: string, desc: string) => void;
 }
 
@@ -119,3 +119,4 @@ const BadgeGrid: React.FC<BadgeGridProps> = ({ publicProfile, onBadgeClick }) =>
 };
 
 export default BadgeGrid;
+
